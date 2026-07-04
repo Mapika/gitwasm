@@ -23,12 +23,42 @@ pub struct Manifest {
     pub hooks: BTreeMap<String, String>,
     #[serde(default)]
     pub merge: Vec<MergeRule>,
+    #[serde(default)]
+    pub limits: Limits,
 }
 
 #[derive(Debug, Deserialize)]
 pub struct MergeRule {
     pub pattern: String,
     pub module: String,
+}
+
+/// Resource caps applied to every module run. Deliberately generous
+/// defaults — they exist to stop hostile or broken modules, not to
+/// tune performance.
+#[derive(Debug, Clone, Copy, Deserialize)]
+pub struct Limits {
+    #[serde(default = "default_fuel")]
+    pub fuel: u64,
+    #[serde(default = "default_memory")]
+    pub memory_bytes: u64,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Limits {
+            fuel: default_fuel(),
+            memory_bytes: default_memory(),
+        }
+    }
+}
+
+fn default_fuel() -> u64 {
+    10_000_000_000 // ~10B instructions: seconds of CPU, far above any honest module
+}
+
+fn default_memory() -> u64 {
+    512 * 1024 * 1024
 }
 
 impl Manifest {
@@ -55,7 +85,11 @@ impl Manifest {
         self.merge
             .iter()
             .find(|rule| {
-                let subject = if rule.pattern.contains('/') { path.as_str() } else { basename };
+                let subject = if rule.pattern.contains('/') {
+                    path.as_str()
+                } else {
+                    basename
+                };
                 glob_match(&rule.pattern, subject)
             })
             .map(|rule| rule.module.as_str())

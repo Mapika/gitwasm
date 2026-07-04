@@ -179,6 +179,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "cargo-lock-merge"
+version = "0.1.0"
+dependencies = [
+ "toml",
+]
+
+[[package]]
 name = "cc"
 version = "1.2.65"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -204,6 +211,10 @@ checksum = "0fa961b519f0b462e3a3b4a34b64d119eeaca1d59af726fe450bbba07a9fc0a1"
 dependencies = [
  "thiserror 2.0.18",
 ]
+
+[[package]]
+name = "commit-lint"
+version = "0.1.0"
 
 [[package]]
 name = "core-foundation-sys"
@@ -700,6 +711,7 @@ dependencies = [
  "toml",
  "wasmtime",
  "wasmtime-wasi",
+ "wat",
 ]
 
 [[package]]

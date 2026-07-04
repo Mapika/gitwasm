@@ -1,0 +1,14 @@
+# gitwasm manifest — maps git extension points to sandboxed wasm modules
+# stored in this directory. See https://github.com/gitwasm/gitwasm
+
+[hooks]
+pre-commit = "secret-scan.wasm"
+commit-msg = "commit-lint.wasm"
+
+[[merge]]
+pattern = "package-lock.json"
+module = "lockfile-merge.wasm"
+
+[[merge]]
+pattern = "Cargo.lock"
+module = "cargo-lock-merge.wasm"

@@ -3,6 +3,9 @@ name = "gitwasm"
 version = "0.1.0"
 edition = "2021"
 description = "Git extension points (hooks, merge drivers) as sandboxed WebAssembly modules committed to the repo itself"
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/gitwasm/gitwasm"
+build = "build.rs"
 
 [dependencies]
 anyhow = "1"
@@ -11,3 +14,6 @@ toml = "0.8"
 tempfile = "3"
 wasmtime = "38"
 wasmtime-wasi = { version = "38", features = ["p1"] }
+
+[dev-dependencies]
+wat = "1"

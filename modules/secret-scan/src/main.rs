@@ -36,7 +36,9 @@ fn main() {
 
     let mut findings = 0usize;
     for file in &files {
-        let Ok(meta) = fs::metadata(file) else { continue };
+        let Ok(meta) = fs::metadata(file) else {
+            continue;
+        };
         if meta.len() > MAX_FILE_BYTES {
             continue;
         }
@@ -48,11 +50,7 @@ fn main() {
         for (line_no, line) in text.lines().enumerate() {
             for (name, re) in &patterns {
                 if re.is_match(line) {
-                    eprintln!(
-                        "secret-scan: {}:{}: {name}",
-                        file.display(),
-                        line_no + 1
-                    );
+                    eprintln!("secret-scan: {}:{}: {name}", file.display(), line_no + 1);
                     findings += 1;
                 }
             }
@@ -67,7 +65,9 @@ fn main() {
 }
 
 fn collect_files(dir: &Path, out: &mut Vec<PathBuf>) {
-    let Ok(entries) = fs::read_dir(dir) else { return };
+    let Ok(entries) = fs::read_dir(dir) else {
+        return;
+    };
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {

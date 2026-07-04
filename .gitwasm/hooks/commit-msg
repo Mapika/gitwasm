@@ -1,0 +1,5 @@
+#!/bin/sh
+if command -v gitwasm >/dev/null 2>&1; then
+  exec gitwasm hook commit-msg "$@"
+fi
+echo "gitwasm: not on PATH; skipping commit-msg hook (see .gitwasm/)" >&2

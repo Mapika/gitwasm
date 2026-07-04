@@ -1,0 +1,5 @@
+#!/bin/sh
+if command -v gitwasm >/dev/null 2>&1; then
+  exec gitwasm hook pre-commit "$@"
+fi
+echo "gitwasm: not on PATH; skipping pre-commit hook (see .gitwasm/)" >&2

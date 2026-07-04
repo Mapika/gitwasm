@@ -21,7 +21,13 @@ fn main() {
     let theirs = read_json(&args[3]);
 
     let mut conflicts = Vec::new();
-    let merged = merge3(base.as_ref(), ours.as_ref(), theirs.as_ref(), "$", &mut conflicts);
+    let merged = merge3(
+        base.as_ref(),
+        ours.as_ref(),
+        theirs.as_ref(),
+        "$",
+        &mut conflicts,
+    );
 
     if !conflicts.is_empty() {
         for c in &conflicts {
@@ -83,8 +89,7 @@ fn merge3(
             let mut out = Map::new();
             for key in keys {
                 let child_path = format!("{path}.{key}");
-                if let Some(v) =
-                    merge3(b.get(key), o.get(key), t.get(key), &child_path, conflicts)
+                if let Some(v) = merge3(b.get(key), o.get(key), t.get(key), &child_path, conflicts)
                 {
                     out.insert(key.clone(), v);
                 }
@@ -95,7 +100,11 @@ fn merge3(
             if parse_version(o).is_some() && parse_version(t).is_some() =>
         {
             // Both bumped the same version string: take the higher one.
-            let winner = if parse_version(o) >= parse_version(t) { o } else { t };
+            let winner = if parse_version(o) >= parse_version(t) {
+                o
+            } else {
+                t
+            };
             eprintln!("lockfile-merge: {path}: both sides bumped, taking {winner}");
             Some(Value::String(winner.clone()))
         }
@@ -113,4 +122,63 @@ fn parse_version(s: &str) -> Option<Vec<u64>> {
         return None;
     }
     parts.iter().map(|p| p.parse::<u64>().ok()).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::merge3;
+    use serde_json::{json, Value};
+
+    fn run(base: Value, ours: Value, theirs: Value) -> Result<Value, Vec<String>> {
+        let mut conflicts = Vec::new();
+        let merged = merge3(Some(&base), Some(&ours), Some(&theirs), "$", &mut conflicts);
+        if conflicts.is_empty() {
+            Ok(merged.unwrap_or(Value::Null))
+        } else {
+            Err(conflicts)
+        }
+    }
+
+    #[test]
+    fn disjoint_additions_merge_clean() {
+        let base = json!({"deps": {"a": "1.0.0"}});
+        let ours = json!({"deps": {"a": "1.0.0", "b": "2.0.0"}});
+        let theirs = json!({"deps": {"a": "1.0.0", "c": "3.0.0"}});
+        let merged = run(base, ours, theirs).unwrap();
+        assert_eq!(merged["deps"]["b"], "2.0.0");
+        assert_eq!(merged["deps"]["c"], "3.0.0");
+    }
+
+    #[test]
+    fn concurrent_version_bumps_take_higher() {
+        let base = json!({"a": "1.0.0"});
+        let ours = json!({"a": "1.2.0"});
+        let theirs = json!({"a": "1.10.0"});
+        assert_eq!(run(base, ours, theirs).unwrap()["a"], "1.10.0");
+    }
+
+    #[test]
+    fn deletion_vs_modification_conflicts() {
+        let base = json!({"a": {"x": 1}});
+        let ours = json!({});
+        let theirs = json!({"a": {"x": 2}});
+        let conflicts = run(base, ours, theirs).unwrap_err();
+        assert_eq!(conflicts, vec!["$.a"]);
+    }
+
+    #[test]
+    fn agreed_deletion_is_clean() {
+        let base = json!({"a": 1, "b": 2});
+        let ours = json!({"b": 2});
+        let theirs = json!({"b": 2});
+        assert_eq!(run(base, ours, theirs).unwrap(), json!({"b": 2}));
+    }
+
+    #[test]
+    fn non_version_scalar_conflict_is_reported() {
+        let base = json!({"name": "app"});
+        let ours = json!({"name": "app-one"});
+        let theirs = json!({"name": "app-two"});
+        assert_eq!(run(base, ours, theirs).unwrap_err(), vec!["$.name"]);
+    }
 }

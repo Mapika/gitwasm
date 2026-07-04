@@ -3,6 +3,8 @@ resolver = "2"
 members = [
     "crates/gitwasm",
     "modules/lockfile-merge",
+    "modules/cargo-lock-merge",
     "modules/secret-scan",
+    "modules/commit-lint",
 ]
 default-members = ["crates/gitwasm"]
