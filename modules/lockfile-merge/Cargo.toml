@@ -1,0 +1,8 @@
+[package]
+name = "lockfile-merge"
+version = "0.1.0"
+edition = "2021"
+description = "Structural 3-way JSON merge for lockfiles — runs sandboxed inside gitwasm"
+
+[dependencies]
+serde_json = { version = "1", features = ["preserve_order"] }

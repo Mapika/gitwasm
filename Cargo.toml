@@ -1,0 +1,8 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/gitwasm",
+    "modules/lockfile-merge",
+    "modules/secret-scan",
+]
+default-members = ["crates/gitwasm"]
