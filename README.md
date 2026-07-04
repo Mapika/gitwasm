@@ -60,11 +60,14 @@ implicitly on clone).
 ## Layout
 
 ```
-crates/gitwasm/           host CLI (wasmtime embed): init / install / list / hook / merge / run
-modules/lockfile-merge/   structural 3-way JSON merge (package-lock.json, ...)
-modules/cargo-lock-merge/ structural 3-way merge for Cargo.lock
-modules/secret-scan/      pre-commit scanner over the staged-tree snapshot
-modules/commit-lint/      conventional-commit linter (commit-msg hook, opt-in)
+crates/gitwasm/            host CLI (wasmtime embed): init / install / list / sign / verify / hook / merge / run
+modules/lockfile-merge/    structural 3-way JSON merge (package-lock.json, package.json)
+modules/cargo-lock-merge/  structural 3-way merge for Cargo.lock
+modules/yarn-lock-merge/   structural 3-way merge for yarn.lock v1
+modules/poetry-lock-merge/ structural 3-way merge for poetry.lock
+modules/lineset-merge/     set-algebra 3-way merge for line-set files (go.sum)
+modules/secret-scan/       pre-commit scanner over the staged-tree snapshot
+modules/commit-lint/       conventional-commit linter (commit-msg hook, opt-in)
 demo/                     end-to-end demos (sh + ps1), run in CI on all 3 OSes
 SPEC.md                   the .gitwasm/ convention — written for second implementations
 SECURITY.md               exact sandbox guarantees and non-guarantees
@@ -93,7 +96,7 @@ and [SECURITY.md](SECURITY.md).
 
 ## Roadmap
 
-- More drivers: `yarn.lock`, `poetry.lock`; tree-sitter semantic
+- More drivers: `pnpm-lock.yaml`, `Gemfile.lock`; tree-sitter semantic
   merge for source files.
 - WASI 0.2 component-model module interface (typed I/O) alongside preview1.
 - **Deterministic, memoized checks**: every run is a pure function

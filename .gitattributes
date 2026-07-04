@@ -3,3 +3,5 @@ Cargo.lock merge=gitwasm
 .gitwasm/** -text
 package.json merge=gitwasm
 go.sum merge=gitwasm
+yarn.lock merge=gitwasm
+poetry.lock merge=gitwasm

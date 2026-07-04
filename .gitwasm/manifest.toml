@@ -20,3 +20,11 @@ module = "cargo-lock-merge.wasm"
 [[merge]]
 pattern = "go.sum"
 module = "lineset-merge.wasm"
+
+[[merge]]
+pattern = "yarn.lock"
+module = "yarn-lock-merge.wasm"
+
+[[merge]]
+pattern = "poetry.lock"
+module = "poetry-lock-merge.wasm"

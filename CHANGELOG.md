@@ -1,5 +1,24 @@
 # Changelog
 
+## Unreleased (0.3.0)
+
+### Added
+
+- **`yarn-lock-merge` module** (yarn.lock v1, stock pattern): atomic-block
+  3-way merge keyed by descriptor line; higher version wins on concurrent
+  bumps; refuses yarn berry (v2+) files rather than corrupting them;
+  parse→serialize round-trips byte-identically.
+- **`poetry-lock-merge` module** (poetry.lock, stock pattern): `name@version`
+  entry-set merge; merge-introduced duplicates collapse to the higher
+  version; conflicting `metadata.content-hash` takes theirs with a
+  `poetry lock --no-update` warning; marker-based multi-version package sets
+  survive intact.
+
+### Known papercuts
+
+- `gitwasm <cmd> | head`-style early pipe closure makes the CLI panic on
+  broken pipe instead of exiting quietly.
+
 ## 0.2.0 — 2026-07-05
 
 The trust release.
