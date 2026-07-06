@@ -1,9 +1,12 @@
 # gitwasm end-to-end demo (Windows). See run-demo.sh for the CI/unix version.
-# Proves four things in a throwaway repo:
+# Proves in a throwaway repo:
 #   1. package-lock.json merges that always conflict in git merge cleanly
 #   2. Cargo.lock concurrent dependency bumps resolve to the higher version
-#   3. a staged AWS key blocks the commit (sandboxed pre-commit)
-#   4. commit-lint (opt-in) rejects non-conventional messages
+#   3. go.sum merges via a typed WASI 0.2 component that imports nothing
+#   4. a staged AWS key blocks the commit (sandboxed pre-commit)
+#   5. commit-lint (opt-in) rejects non-conventional messages
+#   6. a tampered signed module refuses to run (fail-closed)
+#   7. every merge is a cached, content-addressed verdict you can re-derive
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
@@ -93,26 +96,40 @@ checksum = "aaa"
     $lock = Get-Content Cargo.lock -Raw
     Assert ($lock -match '1\.0\.150' -and $lock -notmatch '1\.0\.120') "2. Cargo.lock merged clean, higher version (1.0.150) won"
 
-    Step "Scenario 3: staged AWS key must block the commit"
+    Step "Scenario 3: go.sum merges via a typed WASI 0.2 component (imports nothing)"
+    Set-Content go.sum "golang.org/x/sys v0.1.0 h1:base=`ngolang.org/x/sys v0.1.0/go.mod h1:base="
+    git add go.sum; git commit -q -m "chore: add go.sum baseline"
+    git checkout -q -b gosum-feature
+    Add-Content go.sum "golang.org/x/text v0.3.0 h1:txt=`ngolang.org/x/text v0.3.0/go.mod h1:txt="
+    git commit -q -am "feat: add x/text to go.sum"
+    git checkout -q main
+    Add-Content go.sum "golang.org/x/net v0.5.0 h1:net=`ngolang.org/x/net v0.5.0/go.mod h1:net="
+    git commit -q -am "feat: add x/net to go.sum"
+    git merge gosum-feature -m "Merge branch 'gosum-feature'"
+    if ($LASTEXITCODE -ne 0) { throw "go.sum merge conflicted" }
+    $gosum = Get-Content go.sum -Raw
+    Assert ($gosum -match "x/text" -and $gosum -match "x/net" -and $gosum -match "x/sys") "3. go.sum merged clean by a component that never sees a filesystem"
+
+    Step "Scenario 4: staged AWS key must block the commit"
     # Assembled at runtime so this script itself never contains a key-shaped literal.
     Set-Content config.js ('const awsKey = "' + 'AKIA' + 'IOSFODNN7EXAMPLE' + '";')
     git add config.js
     git commit -q -m "feat: add config" 2>&1 | Out-String | Write-Host
-    Assert ($LASTEXITCODE -ne 0) "3. commit with AWS key was blocked by sandboxed pre-commit"
+    Assert ($LASTEXITCODE -ne 0) "4. commit with AWS key was blocked by sandboxed pre-commit"
     Set-Content config.js 'const awsKey = process.env.AWS_ACCESS_KEY_ID;'
     git add config.js
     git commit -q -m "feat: add config (key from env)"
     if ($LASTEXITCODE -ne 0) { throw "clean commit was blocked" }
 
-    Step "Scenario 4: enable opt-in commit-lint, reject a sloppy message"
+    Step "Scenario 5: enable opt-in commit-lint, reject a sloppy message"
     (Get-Content .gitwasm\manifest.toml -Raw) -replace '# commit-msg', 'commit-msg' | Set-Content .gitwasm\manifest.toml
     gitwasm install | Out-Null
     git commit -q --allow-empty -m "asdf" 2>&1 | Out-String | Write-Host
-    Assert ($LASTEXITCODE -ne 0) "4a. non-conventional message rejected"
+    Assert ($LASTEXITCODE -ne 0) "5a. non-conventional message rejected"
     git commit -q --allow-empty -m "feat: a proper conventional message"
-    Assert ($LASTEXITCODE -eq 0) "4b. conventional message accepted"
+    Assert ($LASTEXITCODE -eq 0) "5b. conventional message accepted"
 
-    Step "Scenario 5: sign .gitwasm/, then tamper with a module - must refuse to run"
+    Step "Scenario 6: sign .gitwasm/, then tamper with a module - must refuse to run"
     $env:GITWASM_KEY_PATH = Join-Path $PSScriptRoot "demo-signing-key"
     if (Test-Path $env:GITWASM_KEY_PATH) { Remove-Item $env:GITWASM_KEY_PATH }
     gitwasm keygen | Out-Null
@@ -122,14 +139,27 @@ checksum = "aaa"
     if ($LASTEXITCODE -ne 0) { throw "signed commit failed" }
     Add-Content -Path .gitwasm\secret-scan.wasm -Value "x" -NoNewline   # the attack: swap/patch a committed module
     gitwasm verify 2>&1 | Out-String | Write-Host
-    Assert ($LASTEXITCODE -ne 0) "5a. tampered module fails gitwasm verify"
+    Assert ($LASTEXITCODE -ne 0) "6a. tampered module fails gitwasm verify"
     git commit -q --allow-empty -m "feat: innocent looking commit" 2>&1 | Out-String | Write-Host
-    Assert ($LASTEXITCODE -ne 0) "5b. tampered module refuses to run - commit blocked fail-closed"
+    Assert ($LASTEXITCODE -ne 0) "6b. tampered module refuses to run - commit blocked fail-closed"
     git checkout -q -- .gitwasm
     git commit -q --allow-empty -m "feat: after restore everything works"
-    Assert ($LASTEXITCODE -eq 0) "5c. restored content verifies and runs again"
+    Assert ($LASTEXITCODE -eq 0) "6c. restored content verifies and runs again"
 
-    Step "Demo complete - all five scenarios passed"
+    Step "Scenario 7: verdicts - every merge above is a re-derivable, cached fact"
+    gitwasm verdicts
+    gitwasm audit
+    if ($LASTEXITCODE -ne 0) { throw "clean audit failed" }
+    $vdir = Join-Path (git rev-parse --absolute-git-dir) "gitwasm\verdicts"
+    $v = (Get-ChildItem (Join-Path $vdir "*.toml") | Select-Object -First 1).FullName
+    (Get-Content $v -Raw) -replace 'exit_code = 0', 'exit_code = 1' | Set-Content $v   # forge a different outcome
+    gitwasm audit 2>&1 | Out-String | Write-Host
+    Assert ($LASTEXITCODE -ne 0) "7a. a forged verdict fails re-derivation - you cannot lie about a verdict"
+    (Get-Content $v -Raw) -replace 'exit_code = 1', 'exit_code = 0' | Set-Content $v
+    gitwasm audit | Out-Null
+    Assert ($LASTEXITCODE -eq 0) "7b. restored verdict re-derives - merges are cached and trustlessly checkable"
+
+    Step "Demo complete - all seven scenarios passed"
     Write-Host "Every behavior above is a wasm blob COMMITTED IN THE REPO, running sandboxed"
     Write-Host "(one mounted directory, no network, no env, fuel + memory limits)."
     Write-Host "Anyone who clones and runs 'gitwasm install' gets identical behavior on any OS."

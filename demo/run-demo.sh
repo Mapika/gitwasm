@@ -80,7 +80,20 @@ git merge cargo-feature -m "Merge branch 'cargo-feature'"
 grep -q '1\.0\.150' Cargo.lock && ! grep -q '1\.0\.120' Cargo.lock
 ok "2. Cargo.lock merged clean, higher version (1.0.150) won"
 
-step "Scenario 3: staged AWS key must block the commit"
+step "Scenario 3: go.sum merges via a typed WASI 0.2 component (imports nothing)"
+printf 'golang.org/x/sys v0.1.0 h1:base=\ngolang.org/x/sys v0.1.0/go.mod h1:base=\n' > go.sum
+git add go.sum && git commit -q -m "chore: add go.sum baseline"
+git checkout -q -b gosum-feature
+printf 'golang.org/x/text v0.3.0 h1:txt=\ngolang.org/x/text v0.3.0/go.mod h1:txt=\n' >> go.sum
+git commit -q -am "feat: add x/text to go.sum"
+git checkout -q main
+printf 'golang.org/x/net v0.5.0 h1:net=\ngolang.org/x/net v0.5.0/go.mod h1:net=\n' >> go.sum
+git commit -q -am "feat: add x/net to go.sum"
+git merge gosum-feature -m "Merge branch 'gosum-feature'"
+grep -q 'x/text' go.sum && grep -q 'x/net' go.sum && grep -q 'x/sys' go.sum
+ok "3. go.sum merged clean by a component that never sees a filesystem"
+
+step "Scenario 4: staged AWS key must block the commit"
 # Assembled at runtime so this script itself never contains a key-shaped literal.
 printf 'const awsKey = "%s%s";\n' 'AKIA' 'IOSFODNN7EXAMPLE' > config.js
 git add config.js
@@ -88,23 +101,23 @@ if git commit -q -m "feat: add config"; then
     echo "DEMO FAILED: commit with AWS key went through" >&2
     exit 1
 fi
-ok "3. commit with AWS key was blocked by sandboxed pre-commit"
+ok "4. commit with AWS key was blocked by sandboxed pre-commit"
 echo 'const awsKey = process.env.AWS_ACCESS_KEY_ID;' > config.js
 git add config.js
 git commit -q -m "feat: add config (key from env)"
 
-step "Scenario 4: enable opt-in commit-lint, reject a sloppy message"
+step "Scenario 5: enable opt-in commit-lint, reject a sloppy message"
 sed -i.bak 's/# commit-msg/commit-msg/' .gitwasm/manifest.toml && rm .gitwasm/manifest.toml.bak
 gitwasm install > /dev/null
 if git commit -q --allow-empty -m "asdf"; then
     echo "DEMO FAILED: non-conventional message accepted" >&2
     exit 1
 fi
-ok "4a. non-conventional message rejected"
+ok "5a. non-conventional message rejected"
 git commit -q --allow-empty -m "feat: a proper conventional message"
-ok "4b. conventional message accepted"
+ok "5b. conventional message accepted"
 
-step "Scenario 5: sign .gitwasm/, then tamper with a module - must refuse to run"
+step "Scenario 6: sign .gitwasm/, then tamper with a module - must refuse to run"
 export GITWASM_KEY_PATH="$ROOT/demo/demo-signing-key"
 rm -f "$GITWASM_KEY_PATH"
 gitwasm keygen > /dev/null
@@ -115,15 +128,30 @@ if gitwasm verify; then
     echo "DEMO FAILED: tampered module passed verify" >&2
     exit 1
 fi
-ok "5a. tampered module fails gitwasm verify"
+ok "6a. tampered module fails gitwasm verify"
 if git commit -q --allow-empty -m "feat: innocent looking commit"; then
     echo "DEMO FAILED: tampered module was allowed to run" >&2
     exit 1
 fi
-ok "5b. tampered module refuses to run - commit blocked fail-closed"
+ok "6b. tampered module refuses to run - commit blocked fail-closed"
 git checkout -q -- .gitwasm
 git commit -q --allow-empty -m "feat: after restore everything works"
-ok "5c. restored content verifies and runs again"
+ok "6c. restored content verifies and runs again"
 
-step "Demo complete - all five scenarios passed"
+step "Scenario 7: verdicts - every merge above is a re-derivable, cached fact"
+gitwasm verdicts
+gitwasm audit                       # re-derive all recorded verdicts from content-addressed inputs
+VDIR="$(git rev-parse --absolute-git-dir)/gitwasm/verdicts"
+V="$VDIR/$(ls "$VDIR" | head -1)"
+sed -i.bak 's/^exit_code = 0/exit_code = 1/' "$V" && rm "$V.bak"   # forge a different outcome
+if gitwasm audit; then
+    echo "DEMO FAILED: a forged verdict passed audit" >&2
+    exit 1
+fi
+ok "7a. a forged verdict fails re-derivation - you cannot lie about a verdict"
+sed -i.bak 's/^exit_code = 1/exit_code = 0/' "$V" && rm "$V.bak"
+gitwasm audit > /dev/null
+ok "7b. restored verdict re-derives - merges are cached and trustlessly checkable"
+
+step "Demo complete - all seven scenarios passed"
 echo "Every behavior above is a wasm blob COMMITTED IN THE REPO, running sandboxed."

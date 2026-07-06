@@ -4,6 +4,7 @@ mod manifest;
 mod runner;
 mod signing;
 mod stock;
+mod verdict;
 
 use std::process::ExitCode;
 
@@ -18,13 +19,30 @@ USAGE:
   gitwasm sign                             sign .gitwasm/ contents (writes signatures.toml)
   gitwasm verify                           check .gitwasm/ against its signatures
   gitwasm trust                            re-pin this clone's trust to the current signers
+  gitwasm verdicts                         list the content-addressed verdicts cached in this clone
+  gitwasm audit [key]                      re-derive cached verdicts and confirm they reproduce
   gitwasm hook <name> [args...]            run the wasm hook registered for <name>
   gitwasm merge <base> <ours> <theirs> <path>
                                            run the wasm merge driver matching <path>
   gitwasm run <module.wasm> [args...]      run a module directly (preopens cwd, read-only)
 ";
 
+/// Restore the default SIGPIPE disposition. Rust's runtime installs SIG_IGN,
+/// which turns a closed reader (`gitwasm list | head`) into an EPIPE that makes
+/// the print machinery panic; the Unix-native behavior is to die quietly on the
+/// signal instead. No-op on platforms without SIGPIPE.
+#[cfg(unix)]
+fn reset_sigpipe() {
+    // SAFETY: called once at startup, before any other thread exists.
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
+#[cfg(not(unix))]
+fn reset_sigpipe() {}
+
 fn main() -> ExitCode {
+    reset_sigpipe();
     let args: Vec<String> = std::env::args().skip(1).collect();
     let result = match args.first().map(String::as_str) {
         Some("init") => commands::init(),
@@ -34,6 +52,8 @@ fn main() -> ExitCode {
         Some("sign") => commands::sign(),
         Some("verify") => commands::verify(),
         Some("trust") => commands::trust(),
+        Some("verdicts") => commands::verdicts(),
+        Some("audit") => commands::audit(args.get(1).map(String::as_str)),
         Some("hook") if args.len() >= 2 => commands::hook(&args[1], &args[2..]),
         Some("merge") if args.len() == 5 => commands::merge(&args[1], &args[2], &args[3], &args[4]),
         Some("run") if args.len() >= 2 => commands::run_direct(&args[1], &args[2..]),

@@ -43,7 +43,7 @@ leaked secrets.
 ## Quickstart
 
 ```sh
-rustup target add wasm32-wasip1
+rustup target add wasm32-wasip1 wasm32-unknown-unknown
 cargo build --release -p gitwasm      # stock modules are compiled + embedded
 ./demo/run-demo.sh                    # or demo\run-demo.ps1 on Windows
 ```
@@ -65,7 +65,7 @@ modules/lockfile-merge/    structural 3-way JSON merge (package-lock.json, packa
 modules/cargo-lock-merge/  structural 3-way merge for Cargo.lock
 modules/yarn-lock-merge/   structural 3-way merge for yarn.lock v1
 modules/poetry-lock-merge/ structural 3-way merge for poetry.lock
-modules/lineset-merge/     set-algebra 3-way merge for line-set files (go.sum)
+modules/lineset-merge/     set-algebra 3-way merge for line-set files (go.sum) — a WASI 0.2 component
 modules/secret-scan/       pre-commit scanner over the staged-tree snapshot
 modules/commit-lint/       conventional-commit linter (commit-msg hook, opt-in)
 demo/                     end-to-end demos (sh + ps1), run in CI on all 3 OSes
@@ -74,8 +74,10 @@ SECURITY.md               exact sandbox guarantees and non-guarantees
 ```
 
 A consuming repo commits only `.gitwasm/` (manifest + wasm blobs) and
-`.gitattributes` lines — see [SPEC.md](SPEC.md) for the format and the module
-ABI (any language that targets `wasm32-wasip1` can implement a module).
+`.gitattributes` lines — see [SPEC.md](SPEC.md) for the format and the two
+module ABIs: WASI **preview1** command modules (`wasm32-wasip1`, any language),
+and typed **WASI 0.2 components** whose merge world imports nothing at all. The
+host runs both; a repo can mix them freely.
 
 ## How execution works
 
@@ -84,7 +86,10 @@ to be committed) into a temp dir and mounts it **read-only** as the module's
 entire world; message hooks additionally get the message as `COMMIT_MSG`.
 `gitwasm merge` mounts a temp dir containing exactly `base`/`ours`/`theirs`;
 the module writes `result`; nonzero exit leaves a normal git conflict for the
-human. Every run is fuel- and memory-limited.
+human. A **component** merge driver skips the mount entirely: the host calls
+its typed `merge3(base, ours, theirs, path) -> result<bytes, conflict>` with an
+empty linker, so the module never sees a filesystem at all. Every run is fuel-,
+memory-, and wall-clock-limited.
 
 ## Signing
 
@@ -94,15 +99,31 @@ pin the signing key at `gitwasm install`; from then on tampered or unsigned
 `.gitwasm/` content **refuses to execute**. Details in [SPEC.md](SPEC.md) §6
 and [SECURITY.md](SECURITY.md).
 
+## Verdicts
+
+Every module run is a pure function of content-addressed inputs, so gitwasm
+records each merge as a **verdict** — `hash(module) + hash(inputs) → {exit,
+result}`, with the module and inputs stored content-addressed under
+`.git/gitwasm/`. An identical merge then replays its recorded result instead of
+re-running, and `gitwasm audit` re-derives every verdict from its stored inputs
+to prove the record is honest — *a verdict you cannot reproduce is one you have
+no reason to believe.* This is the seed of the larger goal (SPEC.md §8): because
+verdicts are reproducible and git-native, they can travel between clones, so a
+team eventually computes each unique `(check, content)` pair exactly once.
+
 ## Roadmap
 
 - More drivers: `pnpm-lock.yaml`, `Gemfile.lock`; tree-sitter semantic
   merge for source files.
-- WASI 0.2 component-model module interface (typed I/O) alongside preview1.
-- **Deterministic, memoized checks**: every run is a pure function
-  `hash(module) + hash(tree) → verdict`, so results are cacheable and
-  trustlessly shareable — the long-term road to CI that never re-runs
-  anything anyone has already run.
+- A typed **hook** world for components (merge drivers are typed as of the
+  WASI 0.2 component ABI — see [SPEC.md](SPEC.md) §5.2; hooks are still
+  preview1).
+- **Verdict distribution**: merge runs are already recorded as content-addressed,
+  re-derivable verdicts (`gitwasm verdicts` / `gitwasm audit`, SPEC.md §8) and
+  memoized per clone. Making them travel through a git ref — so a team or CI
+  computes each unique `(check, content)` pair once — is the next step toward CI
+  that never re-runs anything anyone has already run. Hooks join merges as verdict
+  producers next.
 - **Upstream**: the goal is not this tool — it is `.gitwasm/` as an open
   convention git hosts understand and, eventually, native sandboxed-module
   support in git itself. This repo is the reference implementation.
