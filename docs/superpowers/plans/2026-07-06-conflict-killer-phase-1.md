@@ -81,13 +81,12 @@ mod tests {
         assert!(files.contains(&"yarn-lock-merge.wasm"));
         assert!(files.contains(&"poetry-lock-merge.wasm"));
         assert!(files.contains(&"lineset-merge.wasm"));
-        assert!(files.contains(&"pnpm-lock-merge.wasm"));
         assert!(!files.contains(&"secret-scan.wasm"));
         assert!(!files.contains(&"commit-lint.wasm"));
 
         let manifest = default_manifest_for(InitProfile::Lockfiles);
         assert!(manifest.contains("pattern = \"package-lock.json\""));
-        assert!(manifest.contains("pattern = \"pnpm-lock.yaml\""));
+        assert!(manifest.contains("pattern = \"go.sum\""));
         assert!(!manifest.contains("pre-commit"));
         assert!(!manifest.contains("commit-msg"));
     }
@@ -102,7 +101,7 @@ mod tests {
         assert!(files.contains(&"secret-scan.wasm"));
         assert!(files.contains(&"commit-lint.wasm"));
         assert!(!files.contains(&"lockfile-merge.wasm"));
-        assert!(!files.contains(&"pnpm-lock-merge.wasm"));
+        assert!(!files.contains(&"cargo-lock-merge.wasm"));
 
         let manifest = default_manifest_for(InitProfile::Hooks);
         assert!(manifest.contains("pre-commit = \"secret-scan.wasm\""));
@@ -116,7 +115,7 @@ mod tests {
 
         assert_eq!(lines[0], ".gitwasm/** -text");
         assert!(lines.contains(&"package-lock.json merge=gitwasm".to_string()));
-        assert!(lines.contains(&"pnpm-lock.yaml merge=gitwasm".to_string()));
+        assert!(lines.contains(&"go.sum merge=gitwasm".to_string()));
         assert!(!lines.iter().any(|line| line.contains("secret-scan")));
     }
 }
@@ -157,19 +156,6 @@ impl InitProfile {
         }
     }
 }
-```
-
-Add this stock module entry before `secret-scan.wasm` in `STOCK`:
-
-```rust
-    StockModule {
-        file: "pnpm-lock-merge.wasm",
-        bytes: include_bytes!(concat!(env!("OUT_DIR"), "/pnpm-lock-merge.wasm")),
-        hook: None,
-        merge_patterns: &["pnpm-lock.yaml"],
-        default_on: true,
-        summary: "structural 3-way merge for pnpm-lock.yaml",
-    },
 ```
 
 Replace `default_manifest()` and `gitattributes_lines()` with these functions:
