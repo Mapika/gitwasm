@@ -21,6 +21,11 @@ A participating repository commits:
 Everything under `.gitwasm/` is ordinary committed content: versioned,
 diffable in PRs, and delivered by clone/fetch like any other file.
 
+The reference CLI exposes setup profiles such as `gitwasm init lockfiles`,
+`gitwasm init hooks`, and `gitwasm init all`. These are scaffolding
+affordances only. They choose which stock modules and `.gitattributes` lines to
+write; they do not change the manifest format described below.
+
 ## 2. Manifest format
 
 ```toml
