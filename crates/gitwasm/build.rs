@@ -20,6 +20,7 @@ const PREVIEW1_MODULES: &[&str] = &[
     "cargo-lock-merge",
     "yarn-lock-merge",
     "poetry-lock-merge",
+    "pnpm-lock-merge",
     "secret-scan",
     "commit-lint",
 ];

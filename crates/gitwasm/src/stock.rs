@@ -74,6 +74,14 @@ pub const STOCK: &[StockModule] = &[
         summary: "structural 3-way merge for poetry.lock",
     },
     StockModule {
+        file: "pnpm-lock-merge.wasm",
+        bytes: include_bytes!(concat!(env!("OUT_DIR"), "/pnpm-lock-merge.wasm")),
+        hook: None,
+        merge_patterns: &["pnpm-lock.yaml"],
+        default_on: true,
+        summary: "structural 3-way merge for pnpm-lock.yaml",
+    },
+    StockModule {
         file: "secret-scan.wasm",
         bytes: include_bytes!(concat!(env!("OUT_DIR"), "/secret-scan.wasm")),
         hook: Some("pre-commit"),
@@ -169,7 +177,7 @@ pub fn gitattributes_lines() -> Vec<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{default_manifest_for, gitattributes_lines_for, modules_for, InitProfile};
+    use super::{default_manifest_for, gitattributes_lines_for, modules_for, InitProfile, STOCK};
 
     #[test]
     fn lockfiles_profile_contains_merge_modules_but_no_hooks() {
@@ -219,5 +227,19 @@ mod tests {
         assert!(lines.contains(&"package-lock.json merge=gitwasm".to_string()));
         assert!(lines.contains(&"go.sum merge=gitwasm".to_string()));
         assert!(!lines.iter().any(|line| line.contains("secret-scan")));
+    }
+
+    #[test]
+    fn pnpm_is_registered_as_stock_lockfile_merge_driver() {
+        let pnpm = STOCK
+            .iter()
+            .find(|module| module.file == "pnpm-lock-merge.wasm")
+            .expect("pnpm stock module is registered");
+
+        assert_eq!(pnpm.merge_patterns, &["pnpm-lock.yaml"]);
+        assert!(pnpm.default_on);
+
+        let attrs = gitattributes_lines_for(InitProfile::Lockfiles);
+        assert!(attrs.contains(&"pnpm-lock.yaml merge=gitwasm".to_string()));
     }
 }
