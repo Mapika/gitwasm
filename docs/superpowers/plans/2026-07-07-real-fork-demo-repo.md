@@ -264,16 +264,23 @@ cd /home/markmarosi/projects/magic-resume-gitwasm-demo
 export PATH="$HOME/.local/bin:$PATH"
 HUSKY=0 pnpm --filter @magic-resume/resume-schema test
 HUSKY=0 pnpm --filter @magic-resume/resume-templates test
+HUSKY=0 pnpm --filter @magic-resume/env build
+HUSKY=0 pnpm --filter @magic-resume/utils build
+HUSKY=0 pnpm --filter @magic-resume/resume-templates build
 HUSKY=0 pnpm --filter @magic-resume/mcp test
 HUSKY=0 pnpm --filter @magic-resume/web test
-HUSKY=0 pnpm --filter @magic-resume/web build
+HUSKY=0 pnpm --filter @magic-resume/docs build
+HUSKY=0 pnpm --filter @magic-resume/landing build
 ```
 
 Expected:
 
 ```text
 Each command exits 0.
-The web build completes in self-hosted mode without Clerk or backend secrets.
+The docs and landing builds complete.
+The web privacy scan passes. At this fork point, the upstream apps/web
+production build is not used because it fails after dependency builds with
+missing named app exports such as cn, isCloudMode, and MagicDebugger.
 ```
 
 - [ ] **Step 6: Commit checkpoint**
@@ -800,7 +807,7 @@ permissions:
 
 jobs:
   app:
-    name: app checks
+    name: app-adjacent checks
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -810,7 +817,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Setup pnpm
         run: |
@@ -827,15 +833,20 @@ jobs:
       - name: Install dependencies
         run: HUSKY=0 pnpm install --frozen-lockfile
 
-      - name: Run package checks
+      - name: Run service-free package checks
         run: |
           HUSKY=0 pnpm --filter @magic-resume/resume-schema test
           HUSKY=0 pnpm --filter @magic-resume/resume-templates test
+          HUSKY=0 pnpm --filter @magic-resume/env build
+          HUSKY=0 pnpm --filter @magic-resume/utils build
+          HUSKY=0 pnpm --filter @magic-resume/resume-templates build
           HUSKY=0 pnpm --filter @magic-resume/mcp test
           HUSKY=0 pnpm --filter @magic-resume/web test
 
-      - name: Build self-hosted web app
-        run: HUSKY=0 pnpm --filter @magic-resume/web build
+      - name: Build docs and landing apps
+        run: |
+          HUSKY=0 pnpm --filter @magic-resume/docs build
+          HUSKY=0 pnpm --filter @magic-resume/landing build
 
   gitwasm:
     name: gitwasm verification
@@ -848,7 +859,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Setup pnpm
         run: |
@@ -957,13 +967,13 @@ gh prints the new pull request URL under https://github.com/gitwasm/magic-resume
 Run:
 
 ```bash
-gh pr checks --repo gitwasm/magic-resume-gitwasm-demo --watch
+gh pr checks 1 --repo gitwasm/magic-resume-gitwasm-demo --watch
 ```
 
 Expected:
 
 ```text
-app checks         pass
+app-adjacent checks        pass
 gitwasm verification       pass
 ```
 
@@ -971,7 +981,8 @@ If either job fails, run this command and fix the specific failing command
 before continuing:
 
 ```bash
-gh run view --repo gitwasm/magic-resume-gitwasm-demo --log-failed
+failed_run="$(gh run list --repo gitwasm/magic-resume-gitwasm-demo --branch gitwasm-demo --event pull_request --status failure --limit 1 --json databaseId --jq '.[0].databaseId')"
+gh run view "$failed_run" --repo gitwasm/magic-resume-gitwasm-demo --log-failed
 ```
 
 - [ ] **Step 4: Merge the PR**
