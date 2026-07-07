@@ -172,7 +172,7 @@ snapshots:
     Require-NativeSuccess "pnpm right-pad commit failed"
     git merge pnpm-feature -m "Merge branch 'pnpm-feature'"
     if ($LASTEXITCODE -ne 0) { throw "pnpm lockfile merge conflicted" }
-    $pnpm = Get-Content pnpm-lock.yaml -Raw
+    $pnpm = (Get-Content pnpm-lock.yaml -Raw) -replace "`r`n", "`n"
     Assert (
         $pnpm -match '(?m)^      left-pad:$' -and
         $pnpm -match '(?m)^      right-pad:$' -and
