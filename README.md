@@ -35,6 +35,11 @@ From then on, supported generated files are merged structurally:
 `package-lock.json`, `package.json`, `pnpm-lock.yaml`, `Cargo.lock`,
 `yarn.lock` v1, `poetry.lock`, and `go.sum`.
 
+For a real application demo, see
+[gitwasm/magic-resume-gitwasm-demo](https://github.com/gitwasm/magic-resume-gitwasm-demo):
+a Magic Resume fork that commits signed gitwasm lockfile merge drivers and a
+scripted `pnpm-lock.yaml` conflict demo.
+
 To exercise the broader sandbox, hook, signing, and verdict audit story:
 
 ```sh
